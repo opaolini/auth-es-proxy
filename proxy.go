@@ -19,6 +19,14 @@ func unauthorized(w http.ResponseWriter) {
 	w.Write([]byte("{\"message\":\"unauthorized\"}"))
 }
 
+func copyHeader(dst, src http.Header) {
+	for k, vv := range src {
+		for _, v := range vv {
+			dst.Add(k, v)
+		}
+	}
+}
+
 type Proxy struct {
 	config        *ProxyConfig
 	httpClient    *http.Client
@@ -80,6 +88,7 @@ func (p *Proxy) ProxyRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
+	copyHeader(w.Header(), resp.Header)
 	w.WriteHeader(resp.StatusCode)
 	io.Copy(w, resp.Body)
 }
