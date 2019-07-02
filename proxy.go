@@ -38,13 +38,8 @@ type Proxy struct {
 // isValidTargetEndpoint checks if the request has a valid target depending
 // on the configuration of the proxy
 func (p *Proxy) isValidTargetEndpoint(r *http.Request) bool {
-	if p.config.LogsOnly {
-		if r.URL.Path != BulkLogsEndpoint {
-			return false
-		}
-	}
+	return !p.config.LogsOnly || (p.config.LogsOnly && r.URL.Path == BulkLogsEndpoint)
 
-	return true
 }
 
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -85,7 +80,7 @@ func (p *Proxy) ProxyRequest(w http.ResponseWriter, r *http.Request) {
 	resp, err := p.httpClient.Do(r)
 	if err != nil {
 		http.Error(w, "Server Error", http.StatusInternalServerError)
-		log.Error("ServeHTTP:", err)
+		log.WithField("error", err).Error("Proxy'ing request failed")
 	}
 	defer resp.Body.Close()
 
