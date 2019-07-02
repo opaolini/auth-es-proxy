@@ -42,6 +42,6 @@ func main() {
 
 	listenString := fmt.Sprintf(":%d", cfg.Port)
 	if err := http.ListenAndServe(listenString, proxy); err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 }
