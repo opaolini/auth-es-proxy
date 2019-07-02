@@ -9,8 +9,6 @@ import (
 	"net/http"
 
 	p2pcrypto "github.com/libp2p/go-libp2p-crypto"
-
-	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -79,9 +77,12 @@ func (p *P2PAuthenticator) AuthenticateRequest(r *http.Request) error {
 		return ErrFailedToDecodeSignature
 	}
 
-	keyOk, err := pubKey.Verify(bodyBytes, decodedSignature)
-	if !keyOk || err != nil {
-		return fmt.Errorf("failed to verify signature with err: %s", err)
+	isValidSignature, err := pubKey.Verify(bodyBytes, decodedSignature)
+	if err != nil {
+		return fmt.Errorf("Signature verification failed: %s", err)
+	}
+	if !isValidSignature {
+		return fmt.Errorf("Request signature invalid")
 	}
 
 	return nil
