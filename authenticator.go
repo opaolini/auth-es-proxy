@@ -26,10 +26,6 @@ type Authenticator interface {
 }
 
 type P2PAuthenticator struct {
-	// B64 encoded public keys of identities whose logs are allowed to be
-	// ingested
-	allowedPubKeys []string
-
 	pubKeyMap map[string]p2pcrypto.PubKey
 }
 
@@ -51,8 +47,7 @@ func NewP2PAuthenticator(allowedPubKeys []string) (*P2PAuthenticator, error) {
 	}
 
 	return &P2PAuthenticator{
-		allowedPubKeys: allowedPubKeys,
-		pubKeyMap:      pubKeys,
+		pubKeyMap: pubKeys,
 	}, nil
 }
 
