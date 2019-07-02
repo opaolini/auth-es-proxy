@@ -54,10 +54,11 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if p.config.InputValidation {
-		ok := p.authenticator.AuthenticateRequest(r)
-		if !ok {
+		err := p.authenticator.AuthenticateRequest(r)
+		if err != nil {
 			msg := "not authorized to proxy request"
 			http.Error(w, msg, http.StatusUnauthorized)
+			log.WithField("error", err).Error("AuthenticateRequest returned an error")
 			return
 		}
 	}

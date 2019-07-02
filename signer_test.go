@@ -36,9 +36,9 @@ func TestSignAndAuth(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ok := auth.AuthenticateRequest(request)
-	if !ok {
-		t.Fatal("did not properly authenticate the request")
+	err = auth.AuthenticateRequest(request)
+	if err != nil {
+		t.Fatalf("did not properly authenticate the request with err: %s", err)
 	}
 
 }

@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 
@@ -11,8 +13,16 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var (
+	ErrMissingProxyIDHeader        = errors.New("missing Proxy-ID from request headers")
+	ErrIdIsNotWhitelisted          = errors.New("provided Proxy-ID is whitelisted")
+	ErrFailedToReadRequestBody     = errors.New("failed to read request body")
+	ErrMissingSignatureFromRequest = errors.New("missing signature from request headers")
+	ErrFailedToDecodeSignature     = errors.New("failed to decode signature")
+)
+
 type Authenticator interface {
-	AuthenticateRequest(r *http.Request) bool
+	AuthenticateRequest(r *http.Request) error
 }
 
 type P2PAuthenticator struct {
@@ -48,40 +58,38 @@ func NewP2PAuthenticator(allowedPubKeys []string) (*P2PAuthenticator, error) {
 
 // AuthenticateRequest checks the id of the forwarder and validates the
 // signature
-// TODO: Return error for more specific validation errors?
-func (p *P2PAuthenticator) AuthenticateRequest(r *http.Request) bool {
+func (p *P2PAuthenticator) AuthenticateRequest(r *http.Request) error {
 	id := r.Header.Get(ProxyIDHeader)
 	if id == "" {
 		log.Errorf("missing %s from headers", ProxyIDHeader)
-		return false
+		return ErrMissingProxyIDHeader
 	}
 
 	pubKey, ok := p.pubKeyMap[id]
 	if !ok {
-
-		log.Errorf("id %s not on whitelist", id)
-		return false
+		return ErrIdIsNotWhitelisted
 	}
 	bodyBytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		log.Error("failed to read body")
-		return false
+		return ErrFailedToReadRequestBody
 	}
 	// NOTE: this enables us to reread Body later if necessary
 	r.Body = ioutil.NopCloser(bytes.NewReader(bodyBytes))
 
 	signature := r.Header.Get(ProxySignatureHeader)
+	if signature == "" {
+		return ErrMissingSignatureFromRequest
+	}
 	decodedSignature, err := hex.DecodeString(signature)
 	if err != nil {
 		log.Error("failed to decode signature")
-		return false
+		return ErrFailedToDecodeSignature
 	}
 
-	keyOk, err := key.Verify(bodyBytes, decodedSignature)
+	keyOk, err := pubKey.Verify(bodyBytes, decodedSignature)
 	if !keyOk || err != nil {
-		log.Errorf("failed to verify signature with err: %s", err)
-		return false
+		return fmt.Errorf("failed to verify signature with err: %s", err)
 	}
 
-	return true
+	return nil
 }
