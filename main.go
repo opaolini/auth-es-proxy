@@ -41,7 +41,6 @@ func main() {
 		log.Fatalf("failed to create a new proxy: %s", err)
 	}
 
-	// http.HandleFunc("/", )
 	listenString := fmt.Sprintf(":%d", cfg.Port)
 	if err := http.ListenAndServe(listenString, proxy); err != nil {
 		panic(err)

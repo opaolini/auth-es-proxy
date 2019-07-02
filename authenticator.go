@@ -14,10 +14,10 @@ import (
 )
 
 var (
-	ErrMissingProxyIDHeader        = errors.New("missing Proxy-ID from request headers")
-	ErrIdIsNotWhitelisted          = errors.New("provided Proxy-ID is whitelisted")
+	ErrMissingProxyIDHeader        = errors.New("missing Proxy-ID request header")
+	ErrIdIsNotWhitelisted          = errors.New("provided Proxy-ID is not whitelisted")
 	ErrFailedToReadRequestBody     = errors.New("failed to read request body")
-	ErrMissingSignatureFromRequest = errors.New("missing signature from request headers")
+	ErrMissingSignatureFromRequest = errors.New("missing Proxy-Signature request header")
 	ErrFailedToDecodeSignature     = errors.New("failed to decode signature")
 )
 
@@ -56,7 +56,6 @@ func NewP2PAuthenticator(allowedPubKeys []string) (*P2PAuthenticator, error) {
 func (p *P2PAuthenticator) AuthenticateRequest(r *http.Request) error {
 	id := r.Header.Get(ProxyIDHeader)
 	if id == "" {
-		log.Errorf("missing %s from headers", ProxyIDHeader)
 		return ErrMissingProxyIDHeader
 	}
 
@@ -77,7 +76,6 @@ func (p *P2PAuthenticator) AuthenticateRequest(r *http.Request) error {
 	}
 	decodedSignature, err := hex.DecodeString(signature)
 	if err != nil {
-		log.Error("failed to decode signature")
 		return ErrFailedToDecodeSignature
 	}
 
