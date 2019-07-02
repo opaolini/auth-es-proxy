@@ -1,7 +1,7 @@
 package main
 
 import (
-	"crypto/rand"
+	"errors"
 	"io/ioutil"
 
 	p2pcrypto "github.com/libp2p/go-libp2p-crypto"
@@ -10,14 +10,11 @@ import (
 const ProxyIDHeader = "Proxy-ID"
 const ProxySignatureHeader = "Proxy-Signature"
 
+var ErrEmptyPrivateKeyPath = errors.New("empty path to private key provided, a valid path is necessary")
+
 func getPrivateKey(path string) (p2pcrypto.PrivKey, error) {
 	if path == "" {
-		// If path is empty, generate a new key.
-		priv, _, err := p2pcrypto.GenerateSecp256k1Key(rand.Reader)
-		if err != nil {
-			return nil, err
-		}
-		return priv, nil
+		return nil, ErrEmptyPrivateKeyPath
 	}
 
 	// Otherwise parse the key at the path given.
