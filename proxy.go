@@ -38,7 +38,7 @@ type Proxy struct {
 // isValidTargetEndpoint checks if the request has a valid target depending
 // on the configuration of the proxy
 func (p *Proxy) isValidTargetEndpoint(r *http.Request) bool {
-	return !p.config.LogsOnly || (p.config.LogsOnly && r.URL.Path == BulkLogsEndpoint)
+	return r.URL.Path == BulkLogsEndpoint
 
 }
 

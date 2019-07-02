@@ -26,9 +26,6 @@ type ProxyConfig struct {
 	OutputSigning bool `env:"OUTPUT_SIGNING"`
 	// Private Key is required when output signing is set to true
 	PrivateKeyPath string `env:"PRIVATE_KEY_PATH"`
-
-	// Allow only logs to be proxied
-	LogsOnly bool `env:"LOGS_ONLY" envDefault:"true"`
 }
 
 func main() {
