@@ -24,7 +24,7 @@ type P2PAuthenticator struct {
 }
 
 func NewP2PAuthenticator(allowedPubKeys []string) (*P2PAuthenticator, error) {
-	pubKeys := make(map[string]p2pcrypto.PubKey)
+	pubKeys := map[string]p2pcrypto.PubKey{}
 
 	for _, encodedPubKey := range allowedPubKeys {
 		pubBytes, err := hex.DecodeString(encodedPubKey)
@@ -56,10 +56,10 @@ func (p *P2PAuthenticator) AuthenticateRequest(r *http.Request) bool {
 		return false
 	}
 
-	key, ok := p.pubKeyMap[id]
+	pubKey, ok := p.pubKeyMap[id]
 	if !ok {
 
-		log.Errorf("id %s not in keymap", id)
+		log.Errorf("id %s not on whitelist", id)
 		return false
 	}
 	bodyBytes, err := ioutil.ReadAll(r.Body)

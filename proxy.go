@@ -35,7 +35,7 @@ type Proxy struct {
 	authenticator Authenticator
 }
 
-// isValidTargetEndpoint checks if the request is has a valid target depending
+// isValidTargetEndpoint checks if the request has a valid target depending
 // on the configuration of the proxy
 func (p *Proxy) isValidTargetEndpoint(r *http.Request) bool {
 	if p.config.LogsOnly {
@@ -72,7 +72,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// RequestURI should not be set, otherwise http.Client witll throw an
+	// RequestURI should not be set, otherwise http.Client will throw an
 	// error
 	r.RequestURI = ""
 	r.URL = p.remoteURL
