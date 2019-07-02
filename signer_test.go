@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/hex"
-	"fmt"
 	"io/ioutil"
 	"net/http/httptest"
 	"testing"
@@ -64,12 +63,16 @@ func TestSerializeAndDeserialize(t *testing.T) {
 }
 
 func TestLoadPrivateKey(t *testing.T) {
+	expectedSignerPubKey := "036a775c4db73fd351191d0a0e19862ecbb70cbe2626097adfb70ffd4f9ea081bf"
 	signer, err := NewP2PSignerFromKeyPath("./__fixtures__/privkey")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	fmt.Println(signer.PubKey())
+	if signer.PubKey() != expectedSignerPubKey {
+		t.Fatalf("invalid pubkey, expected %s instead got %s", expectedSignerPubKey, signer.PubKey())
+	}
+
 }
 
 func BenchmarkSigningData(b *testing.B) {
