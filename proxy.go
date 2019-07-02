@@ -2,8 +2,8 @@ package main
 
 import (
 	"errors"
-	"io"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"strings"
 
@@ -19,17 +19,9 @@ func unauthorized(w http.ResponseWriter) {
 	w.Write([]byte("{\"message\":\"unauthorized\"}"))
 }
 
-func copyHeader(dst, src http.Header) {
-	for k, vv := range src {
-		for _, v := range vv {
-			dst.Add(k, v)
-		}
-	}
-}
-
 type Proxy struct {
 	config        *ProxyConfig
-	httpClient    *http.Client
+	httpProxy     *httputil.ReverseProxy
 	remoteURL     *url.URL
 	signer        Signer
 	authenticator Authenticator
@@ -72,31 +64,18 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// RequestURI should not be set, otherwise http.Client will throw an
-	// error
-	r.RequestURI = ""
-	r.URL = p.remoteURL
-
-	p.ProxyRequest(w, r)
-}
-
-func (p *Proxy) ProxyRequest(w http.ResponseWriter, r *http.Request) {
-	resp, err := p.httpClient.Do(r)
-	if err != nil {
-		http.Error(w, "Server Error", http.StatusInternalServerError)
-		log.WithField("error", err).Error("Proxy'ing request failed")
-	}
-	defer resp.Body.Close()
-
-	copyHeader(w.Header(), resp.Header)
-	w.WriteHeader(resp.StatusCode)
-	io.Copy(w, resp.Body)
+	p.httpProxy.ServeHTTP(w, r)
 }
 
 func NewProxy(pc *ProxyConfig) (*Proxy, error) {
+	targetURL, err := url.Parse(pc.RemoteAddress)
+	if err != nil {
+		return nil, err
+	}
+
 	proxy := &Proxy{
-		config:     pc,
-		httpClient: &http.Client{},
+		config:    pc,
+		httpProxy: httputil.NewSingleHostReverseProxy(targetURL),
 	}
 
 	if pc.OutputSigning {
@@ -120,13 +99,6 @@ func NewProxy(pc *ProxyConfig) (*Proxy, error) {
 
 		proxy.authenticator = authenticator
 	}
-
-	targetURL, err := url.Parse(pc.RemoteAddress)
-	if err != nil {
-		return nil, err
-	}
-
-	proxy.remoteURL = targetURL
 
 	return proxy, nil
 }
