@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"crypto/rand"
-	"encoding/hex"
 	"io/ioutil"
 	"net/http/httptest"
 	"testing"
@@ -41,25 +40,6 @@ func TestSignAndAuth(t *testing.T) {
 		t.Fatalf("did not properly authenticate the request with err: %s", err)
 	}
 
-}
-
-func TestSerializeAndDeserialize(t *testing.T) {
-	pubKeyHex := "036a775c4db73fd351191d0a0e19862ecbb70cbe2626097adfb70ffd4f9ea081bf"
-	pubBytes, err := hex.DecodeString(pubKeyHex)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	pub, err := p2pcrypto.UnmarshalSecp256k1PublicKey(pubBytes)
-	rawPubKey, err := pub.Raw()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	returnedPub := hex.EncodeToString(rawPubKey)
-	if returnedPub != pubKeyHex {
-		t.Fatal("not matching public keys")
-	}
 }
 
 func TestLoadPrivateKey(t *testing.T) {
