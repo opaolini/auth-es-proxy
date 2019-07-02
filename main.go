@@ -1,7 +1,6 @@
 package main
 
 import (
-	// if using go modules
 	"fmt"
 	"net/http"
 
@@ -16,7 +15,8 @@ type ProxyConfig struct {
 	// Proxy target
 	RemoteAddress string `env:"REMOTE_ADDRESS"`
 
-	// InputValidation enables the
+	// InputValidation enables the proxy to validate the incoming proxy
+	// requests using
 	InputValidation bool `env:"INPUT_VALIDATION"`
 	// Allowed Public identities passed in as comma separated b64 encoded
 	// pubkeys
