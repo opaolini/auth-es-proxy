@@ -20,7 +20,6 @@ type ProxyConfig struct {
 	InputValidation bool `env:"INPUT_VALIDATION"`
 	// Allowed Public identities passed in as comma separated b64 encoded
 	// pubkeys
-	// TODO: Will be refactored into a config file
 	AllowedIDs string `env:"ALLOWED_IDS"`
 
 	OutputSigning bool `env:"OUTPUT_SIGNING"`
