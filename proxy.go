@@ -50,12 +50,16 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if p.config.InputValidation {
 		err := p.authenticator.AuthenticateRequest(r)
-		if err != nil {
+		switch err.(type) {
+		case ErrIDNotWhitelisted:
+		case ErrSignatureInvalid:
 			msg := "not authorized to proxy request"
 			http.Error(w, msg, http.StatusUnauthorized)
-			log.WithField("error", err).Error("AuthenticateRequest returned an error")
-			return
+		default:
+			http.Error(w, err.Error(), http.StatusBadRequest)
 		}
+		log.WithField("error", err).Error("AuthenticateRequest returned an error")
+		return
 	}
 
 	if p.config.OutputSigning {

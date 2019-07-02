@@ -13,11 +13,24 @@ import (
 
 var (
 	ErrMissingProxyIDHeader        = errors.New("missing Proxy-ID request header")
-	ErrIdIsNotWhitelisted          = errors.New("provided Proxy-ID is not whitelisted")
 	ErrFailedToReadRequestBody     = errors.New("failed to read request body")
 	ErrMissingSignatureFromRequest = errors.New("missing Proxy-Signature request header")
 	ErrFailedToDecodeSignature     = errors.New("failed to decode signature")
 )
+
+type ErrIDNotWhitelisted struct {
+	ID string
+}
+
+func (e ErrIDNotWhitelisted) Error() string {
+	return fmt.Sprintf("provided Proxy-ID is not whitelisted: %s", e.ID)
+}
+
+type ErrSignatureInvalid struct{}
+
+func (e ErrSignatureInvalid) Error() string {
+	return "Request signature invalid"
+}
 
 type Authenticator interface {
 	AuthenticateRequest(r *http.Request) error
@@ -59,7 +72,7 @@ func (p *P2PAuthenticator) AuthenticateRequest(r *http.Request) error {
 
 	pubKey, ok := p.pubKeyMap[id]
 	if !ok {
-		return ErrIdIsNotWhitelisted
+		return &ErrIDNotWhitelisted{id}
 	}
 	bodyBytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
@@ -82,7 +95,7 @@ func (p *P2PAuthenticator) AuthenticateRequest(r *http.Request) error {
 		return fmt.Errorf("Signature verification failed: %s", err)
 	}
 	if !isValidSignature {
-		return fmt.Errorf("Request signature invalid")
+		return &ErrSignatureInvalid{}
 	}
 
 	return nil
