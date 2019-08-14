@@ -25,6 +25,11 @@ type ProxyConfig struct {
 	OutputSigning bool `env:"OUTPUT_SIGNING"`
 	// Private Key is required when output signing is set to true
 	PrivateKeyPath string `env:"PRIVATE_KEY_PATH"`
+
+	// If set to an non-empty string the proxy will check whether the
+	// requested path matches the this REGEX pattern, otherwise returns
+	// unaothrized
+	AllowedPathRegex string `env:"ALLOWED_PATH_REGEX" envDefault:""`
 }
 
 func main() {
@@ -41,6 +46,7 @@ func main() {
 	}
 
 	listenString := fmt.Sprintf(":%d", cfg.Port)
+	log.Infof("starting proxy on: %s", listenString)
 	if err := http.ListenAndServe(listenString, proxy); err != nil {
 		log.Panic(err)
 	}
