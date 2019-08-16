@@ -9,6 +9,7 @@ import (
 
 var (
 	ErrInvalidUserOrPassword = errors.New("incorrect username or password")
+	ErrFailedHttpBasicAuth   = errors.New("failed http basic auth, missing or malformed Authorization headers?")
 )
 
 // BasicAuthenticator uses HTTP Basic Auth to check whether the incoming request
@@ -22,7 +23,7 @@ func (a *BasicAuthenticator) AuthenticateRequest(r *http.Request) error {
 	user, pass, ok := r.BasicAuth()
 
 	if !ok {
-		return errors.New("failed http basic auth, missing or malformed Authorization headers?")
+		return ErrFailedHttpBasicAuth
 	}
 
 	password, userPresent := a.allowedUsers[user]
