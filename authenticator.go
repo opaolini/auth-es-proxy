@@ -11,6 +11,12 @@ import (
 	p2pcrypto "github.com/libp2p/go-libp2p-crypto"
 )
 
+const (
+	BasicAuthScheme = "basicauth"
+	SigningScheme   = "ecdsasignatures"
+	NoAuth          = "none"
+)
+
 var (
 	ErrMissingProxyIDHeader        = errors.New("missing Proxy-ID request header")
 	ErrFailedToReadRequestBody     = errors.New("failed to read request body")

@@ -62,11 +62,17 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case ErrSignatureInvalid:
 			msg := "not authorized to proxy request"
 			http.Error(w, msg, http.StatusUnauthorized)
+
+			log.
+				WithField("error", err).
+				WithField("proxy-id", r.Header.Get(ProxyIDHeader)).
+				Warning("AuthenticateRequest not authorized to proxy request")
+			return
 		default:
 			http.Error(w, err.Error(), http.StatusBadRequest)
+			log.WithField("error", err).Error("AuthenticateRequest returned an error")
+			return
 		}
-		log.WithField("error", err).Error("AuthenticateRequest returned an error")
-		return
 	}
 
 	if p.config.OutputSigning {
@@ -105,13 +111,30 @@ func NewProxy(pc *ProxyConfig) (*Proxy, error) {
 	}
 
 	if pc.InputValidation {
-		allowedPubKeys := strings.Split(pc.AllowedIDs, ",")
-		authenticator, err := NewP2PAuthenticator(allowedPubKeys)
-		if err != nil {
-			return nil, err
+
+		switch pc.AuthenticationScheme {
+		case BasicAuthScheme:
+			authenticator, err := NewBasicAuthenticatorFromConfigString(pc.AllowedBasicAuthUserString)
+			if err != nil {
+				return nil, err
+			}
+
+			proxy.authenticator = authenticator
+		case SigningScheme:
+			allowedPubKeys := strings.Split(pc.AllowedIDs, ",")
+			authenticator, err := NewP2PAuthenticator(allowedPubKeys)
+			if err != nil {
+				return nil, err
+			}
+
+			proxy.authenticator = authenticator
+		case NoAuth:
+			log.Warning("no authentication selected")
+		default:
+			log.Fatal("unknown authentication scheme provided")
+
 		}
 
-		proxy.authenticator = authenticator
 	}
 
 	if pc.AllowedPathRegex != "" {
