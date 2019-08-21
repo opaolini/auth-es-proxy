@@ -6,7 +6,7 @@ WORKDIR /src
 
 ADD . ./
 
-RUN go build -mod=vendor
+RUN go build
 
 # final image
 FROM alpine:3.9
