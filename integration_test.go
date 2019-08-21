@@ -98,10 +98,10 @@ func TestBasicSingleProxySetup(t *testing.T) {
 	}
 
 	go func() {
-		t.Log(http.ListenAndServe("localhost:3011", proxy))
+		t.Log(http.ListenAndServe("localhost:3012", proxy))
 	}()
 
-	resp, err := tc.SendPOST("http://localhost:3011/", payloadBytes)
+	resp, err := tc.SendPOST("http://localhost:3012/", payloadBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
