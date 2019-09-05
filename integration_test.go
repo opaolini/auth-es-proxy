@@ -125,9 +125,6 @@ func TestAllowedRegexpProxy(t *testing.T) {
 
 	ctx := context.TODO()
 
-	payload := fmt.Sprintf("{%q:%q}", "hello", "world")
-	payloadBytes := []byte(payload)
-
 	go es.Start()
 
 	proxyConfig := ProxyConfig{
@@ -142,6 +139,9 @@ func TestAllowedRegexpProxy(t *testing.T) {
 	go func() {
 		t.Log(http.ListenAndServe("localhost:3011", proxy))
 	}()
+
+	payload := fmt.Sprintf("{%q:%q}", "hello", "world")
+	payloadBytes := []byte(payload)
 
 	resp, err := tc.SendPOST("http://localhost:3011/disallowed/path", payloadBytes)
 
