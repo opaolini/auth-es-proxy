@@ -16,7 +16,7 @@ var (
 // is allowed access.
 type BasicAuthenticator struct {
 	// mapping of user to password
-	allowedUsers map[string]string
+	userToPassword map[string]string
 }
 
 func (a *BasicAuthenticator) AuthenticateRequest(r *http.Request) error {
@@ -26,7 +26,7 @@ func (a *BasicAuthenticator) AuthenticateRequest(r *http.Request) error {
 		return ErrFailedHttpBasicAuth
 	}
 
-	password, userPresent := a.allowedUsers[user]
+	password, userPresent := a.userToPassword[user]
 
 	if !userPresent || password != pass {
 		return ErrInvalidUserOrPassword
@@ -35,12 +35,12 @@ func (a *BasicAuthenticator) AuthenticateRequest(r *http.Request) error {
 	return nil
 }
 
-func NewBasicAuthenticator(allowedUsers map[string]string) (*BasicAuthenticator, error) {
-	if len(allowedUsers) == 0 {
-		return nil, errors.New("provided an empty allowedUsers map")
+func NewBasicAuthenticator(userToPassword map[string]string) (*BasicAuthenticator, error) {
+	if len(userToPassword) == 0 {
+		return nil, errors.New("provided an empty userToPassword map")
 	}
 	return &BasicAuthenticator{
-		allowedUsers: allowedUsers,
+		userToPassword: userToPassword,
 	}, nil
 }
 
@@ -48,27 +48,27 @@ func NewBasicAuthenticator(allowedUsers map[string]string) (*BasicAuthenticator,
 // string into a mapping of users to passwords
 func parseAllowedUsersString(userString string) (map[string]string, error) {
 	if userString == "" {
-		return map[string]string{}, fmt.Errorf("empty userString provided")
+		return nil, errors.New("empty userString provided")
 	}
 
-	allowedUsers := map[string]string{}
+	userToPassword := map[string]string{}
 	pairs := strings.Split(userString, ",")
 	for _, pair := range pairs {
 		userPassword := strings.Split(pair, ":")
 		if len(userPassword) != 2 {
-			return map[string]string{}, fmt.Errorf("could not parse the following user pair: %s", pair)
+			return nil, fmt.Errorf("could not parse the following user pair: %s", pair)
 		}
 
 		user, password := strings.TrimSpace(userPassword[0]), strings.TrimSpace(userPassword[1])
-		allowedUsers[user] = password
+		userToPassword[user] = password
 	}
-	return allowedUsers, nil
+	return userToPassword, nil
 }
 
 func NewBasicAuthenticatorFromConfigString(allowedUserString string) (*BasicAuthenticator, error) {
-	allowedUsers, err := parseAllowedUsersString(allowedUserString)
+	userToPassword, err := parseAllowedUsersString(allowedUserString)
 	if err != nil {
 		return nil, err
 	}
-	return NewBasicAuthenticator(allowedUsers)
+	return NewBasicAuthenticator(userToPassword)
 }

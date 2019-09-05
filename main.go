@@ -10,23 +10,23 @@ import (
 )
 
 type ProxyConfig struct {
-	// Port on whch the proxy is listening on
+	// Port on which the proxy is listening on
 	Port int `env:"PORT" envDefault:"3000"`
 
 	// Proxy target
 	RemoteAddress string `env:"REMOTE_ADDRESS"`
 
-	// InputValidation enables the proxy to validate / authenticate the
+	// ShouldValidateRequests enables the proxy to validate / authenticate the
 	// incoming proxy requests using
-	InputValidation bool `env:"INPUT_VALIDATION"`
+	ShouldValidateRequests bool `env:"SHOULD_VALIDATE_REQUESTS"`
 
 	// one of: [ "ecdsasignatures", "basicauth", "none" ]
 	AuthenticationScheme string `env:"AUTHENTICATION_SCHEME" envDefault:"basicauth"`
 
 	// if AuthenticationScheme is basicauth then this string is used for
-	// determinig allowed user / password pairs.
+	// determining allowed user / password pairs.
 	// NOTE: the string format is: user1:password1,user2:password2
-	AllowedBasicAuthUserString string `env:"ALLOWED_USERS_STRING" envDefault:""`
+	AllowedBasicAuthUserString string `env:"ALLOWED_USERS_BASIC_AUTH_STRING" envDefault:""`
 
 	// If AuthenticationScheme is ecdsasigning then this string is used for
 	// determining allowed public identities
@@ -34,14 +34,14 @@ type ProxyConfig struct {
 	AllowedIDs string `env:"ALLOWED_IDS"`
 
 	// Should the proxied request be signed by auth-es-proxy
-	OutputSigning bool `env:"OUTPUT_SIGNING"`
+	ShouldSignOutgoing bool `env:"SHOULD_SIGN_OUTGOING"`
 
 	// Private Key is required when output signing is set to true
 	PrivateKeyPath string `env:"PRIVATE_KEY_PATH"`
 
-	// If set to an non-empty string the proxy will check whether the
-	// requested path matches the this REGEX pattern otherwise returns
-	// unaothrized
+	// If set to a non-empty string the proxy will check whether the
+	// requested path matches this REGEX pattern otherwise returns
+	// unauthorized
 	AllowedPathRegex string `env:"ALLOWED_PATH_REGEX" envDefault:""`
 }
 

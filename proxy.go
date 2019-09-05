@@ -46,14 +46,12 @@ func (p *Proxy) isValidTargetEndpoint(r *http.Request) bool {
 }
 
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if p.config.AllowedPathRegex != "" {
-		if !p.isValidTargetEndpoint(r) {
-			unauthorized(w)
-			return
-		}
+	if p.config.AllowedPathRegex != "" && !p.isValidTargetEndpoint(r) {
+		unauthorized(w)
+		return
 	}
 
-	if p.config.InputValidation {
+	if p.config.ShouldValidateRequests {
 		err := p.authenticator.AuthenticateRequest(r)
 		switch err.(type) {
 		case nil:
@@ -75,7 +73,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if p.config.OutputSigning {
+	if p.config.ShouldSignOutgoing {
 		err := p.signer.SignRequest(r)
 		if err != nil {
 			msg := "could not sign request"
@@ -98,7 +96,7 @@ func NewProxy(pc *ProxyConfig) (*Proxy, error) {
 		httpClient: &http.Client{},
 	}
 
-	if pc.OutputSigning {
+	if pc.ShouldSignOutgoing {
 		if pc.PrivateKeyPath == "" {
 			return nil, errors.New("missing private key")
 		}
@@ -110,17 +108,17 @@ func NewProxy(pc *ProxyConfig) (*Proxy, error) {
 		proxy.signer = signer
 	}
 
-	if pc.InputValidation {
+	if pc.ShouldValidateRequests {
 
 		switch pc.AuthenticationScheme {
-		case BasicAuthScheme:
+		case BASIC_AUTH_SCHEME:
 			authenticator, err := NewBasicAuthenticatorFromConfigString(pc.AllowedBasicAuthUserString)
 			if err != nil {
 				return nil, err
 			}
 
 			proxy.authenticator = authenticator
-		case SigningScheme:
+		case ECDSA_SIGNATURE_SCHEME:
 			allowedPubKeys := strings.Split(pc.AllowedIDs, ",")
 			authenticator, err := NewP2PAuthenticator(allowedPubKeys)
 			if err != nil {
@@ -128,7 +126,7 @@ func NewProxy(pc *ProxyConfig) (*Proxy, error) {
 			}
 
 			proxy.authenticator = authenticator
-		case NoAuth:
+		case NO_AUTH:
 			log.Warning("no authentication selected")
 		default:
 			log.Fatal("unknown authentication scheme provided")
