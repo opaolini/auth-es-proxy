@@ -8,6 +8,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 const TestHeaderKey = "X-Test-Header"
@@ -81,7 +83,7 @@ func TestBasicSingleProxySetup(t *testing.T) {
 	tc := newTestClient()
 	es := newEchoServer("localhost:3010")
 
-	ctx := context.TODO()
+	ctx := context.Background()
 
 	payload := fmt.Sprintf("{%q:%q}", "hello", "world")
 	payloadBytes := []byte(payload)
@@ -89,40 +91,32 @@ func TestBasicSingleProxySetup(t *testing.T) {
 	go es.Start()
 
 	proxyConfig := ProxyConfig{
-		RemoteAddress:   "http://localhost:3010/",
-		InputValidation: false,
+		RemoteAddress:          "http://localhost:3010/",
+		ShouldValidateRequests: false,
 	}
 	proxy, err := NewProxy(&proxyConfig)
-	if err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, err)
 
 	go func() {
 		t.Log(http.ListenAndServe("localhost:3012", proxy))
 	}()
 
 	resp, err := tc.SendPOST("http://localhost:3012/", payloadBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, err)
 
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("could not read body with err: %s", err)
-	}
 
-	if !bytes.Equal(bodyBytes, payloadBytes) {
-		t.Fatalf("the body does not the expected payload, received: %s , expected: %s", bodyBytes, payloadBytes)
-	}
+	require.NoError(t, err, "could not read body")
+
+	require.Truef(t, bytes.Equal(bodyBytes, payloadBytes), "the body does not have the expected payload, received: %s , expected: %s", bodyBytes, payloadBytes)
 
 	headerValue := resp.Header.Get(TestHeaderKey)
 
-	if headerValue != TestHeaderValue {
-		t.Fatalf("the expected value for %s header is %s instead got %s", TestHeaderKey, TestHeaderValue, headerValue)
-	}
+	require.Equalf(t, headerValue, TestHeaderValue, "the expected value for %s header is %s instead got %s", TestHeaderKey, TestHeaderValue, headerValue)
 
 	es.Stop(ctx)
-
 }
 
 func TestAllowedRegexpProxy(t *testing.T) {
@@ -137,37 +131,31 @@ func TestAllowedRegexpProxy(t *testing.T) {
 	go es.Start()
 
 	proxyConfig := ProxyConfig{
-		RemoteAddress:    "http://localhost:3010/",
-		InputValidation:  false,
-		AllowedPathRegex: "/$",
+		RemoteAddress:          "http://localhost:3010/",
+		ShouldValidateRequests: false,
+		AllowedPathRegex:       "/$",
 	}
 	proxy, err := NewProxy(&proxyConfig)
-	if err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, err)
 
 	go func() {
 		t.Log(http.ListenAndServe("localhost:3011", proxy))
 	}()
 
-	resp, err := tc.SendPOST("http://localhost:3011/unallowed/path", payloadBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	resp, err := tc.SendPOST("http://localhost:3011/disallowed/path", payloadBytes)
 
-	if resp.StatusCode == 200 {
-		t.Fatal("expected status code to not be 200")
-	}
+	require.NoError(t, err)
+
+	require.NotEqual(t, 200, resp.StatusCode, "expected status code to not be 200")
 
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("could not read body with err: %s", err)
-	}
+
+	require.NoError(t, err, "could not read body with err")
 
 	unauthorizedString := fmt.Sprintf("{%q:%q}", "message", "unauthorized")
-	if !bytes.Equal(bodyBytes, []byte(unauthorizedString)) {
-		t.Fatalf("the body does not the expected payload, received: %s , expected: %s", bodyBytes, payloadBytes)
-	}
+
+	require.Truef(t, bytes.Equal(bodyBytes, []byte(unauthorizedString)), "the body does not the expected payload, received: %s , expected: %s", bodyBytes, payloadBytes)
 
 	es.Stop(ctx)
 }

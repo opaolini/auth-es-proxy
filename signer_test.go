@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	p2pcrypto "github.com/libp2p/go-libp2p-crypto"
+	"github.com/stretchr/testify/require"
 )
 
 const signerData = `
@@ -25,34 +26,25 @@ func TestSignAndAuth(t *testing.T) {
 
 	err = signer.SignRequest(request)
 
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	allowedIDs := []string{"036a775c4db73fd351191d0a0e19862ecbb70cbe2626097adfb70ffd4f9ea081bf"}
 	auth, err := NewP2PAuthenticator(allowedIDs)
-	if err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, err)
 
 	err = auth.AuthenticateRequest(request)
-	if err != nil {
-		t.Fatalf("did not properly authenticate the request with err: %s", err)
-	}
 
+	require.NoError(t, err, "did not properly authenticate the request with err: %s")
 }
 
 func TestLoadPrivateKey(t *testing.T) {
 	expectedSignerPubKey := "036a775c4db73fd351191d0a0e19862ecbb70cbe2626097adfb70ffd4f9ea081bf"
 	signer, err := NewP2PSignerFromKeyPath("./__fixtures__/privkey")
-	if err != nil {
-		t.Fatal(err)
-	}
 
-	if signer.PubKey() != expectedSignerPubKey {
-		t.Fatalf("invalid pubkey, expected %s instead got %s", expectedSignerPubKey, signer.PubKey())
-	}
+	require.NoError(t, err)
 
+	require.Equalf(t, signer.PubKey(), expectedSignerPubKey, "invalid pubkey, expected %s instead got %s", expectedSignerPubKey, signer.PubKey())
 }
 
 func BenchmarkSigningData(b *testing.B) {
