@@ -7,5 +7,7 @@ require (
 	github.com/caarlos0/env/v6 v6.0.0
 	github.com/libp2p/go-libp2p v0.2.0 // indirect
 	github.com/libp2p/go-libp2p-crypto v0.1.0
+	github.com/magiconair/properties v1.8.1
 	github.com/sirupsen/logrus v1.4.2
+	github.com/stretchr/testify v1.4.0
 )
