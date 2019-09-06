@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	BASIC_AUTH_SCHEME      = "basicauth"
-	ECDSA_SIGNATURE_SCHEME = "ecdsasignatures"
-	NO_AUTH                = "none"
+	BasicAuthScheme      = "BASIC_AUTH_SCHEME"
+	EcdsaSignatureScheme = "ECDSA_SIGNATURE_SCHEME"
+	NoAuth               = "NO_AUTH_SCHEME"
 )
 
 var (

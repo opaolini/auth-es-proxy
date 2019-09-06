@@ -15,6 +15,11 @@ import (
 // elasticsearch endpoint
 const BulkLogsEndpoint = "/_bulk"
 
+var (
+	ErrAllowedIDsNotUsed  = errors.New("AllowedIDs is set but not used with the selected authentication scheme")
+	ErrUsersStringNotUsed = errors.New("AllowedBasicAuthUserString is set but not used with the selected authentication scheme")
+)
+
 func unauthorized(w http.ResponseWriter) {
 	w.WriteHeader(http.StatusUnauthorized)
 	w.Write([]byte("{\"message\":\"unauthorized\"}"))
@@ -111,14 +116,22 @@ func NewProxy(pc *ProxyConfig) (*Proxy, error) {
 	if pc.ShouldValidateRequests {
 
 		switch pc.AuthenticationScheme {
-		case BASIC_AUTH_SCHEME:
+		case BasicAuthScheme:
+			if pc.AllowedIDs != "" {
+				return nil, ErrAllowedIDsNotUsed
+			}
+
 			authenticator, err := NewBasicAuthenticatorFromConfigString(pc.AllowedBasicAuthUserString)
 			if err != nil {
 				return nil, err
 			}
 
 			proxy.authenticator = authenticator
-		case ECDSA_SIGNATURE_SCHEME:
+		case EcdsaSignatureScheme:
+			if pc.AllowedBasicAuthUserString != "" {
+				return nil, ErrUsersStringNotUsed
+			}
+
 			allowedPubKeys := strings.Split(pc.AllowedIDs, ",")
 			authenticator, err := NewP2PAuthenticator(allowedPubKeys)
 			if err != nil {
@@ -126,7 +139,7 @@ func NewProxy(pc *ProxyConfig) (*Proxy, error) {
 			}
 
 			proxy.authenticator = authenticator
-		case NO_AUTH:
+		case NoAuth:
 			log.Warning("no authentication selected")
 		default:
 			log.Fatal("unknown authentication scheme provided")
