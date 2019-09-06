@@ -44,7 +44,7 @@ func NewBasicAuthenticator(userToPassword map[string]string) (*BasicAuthenticato
 	}, nil
 }
 
-// parseAllowedUsesrString is used to convert a user1:password1,user2:password2
+// parseAllowedUsersString is used to convert a user1:password1,user2:password2
 // string into a mapping of users to passwords
 func parseAllowedUsersString(userString string) (map[string]string, error) {
 	if userString == "" {
