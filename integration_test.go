@@ -116,6 +116,7 @@ func TestBasicSingleProxySetup(t *testing.T) {
 
 	require.Equalf(t, headerValue, TestHeaderValue, "the expected value for %s header is %s instead got %s", TestHeaderKey, TestHeaderValue, headerValue)
 
+	// TODO(oskar) - gracefully stop proxy by the end of the test
 	es.Stop(ctx)
 }
 
@@ -157,5 +158,6 @@ func TestAllowedRegexpProxy(t *testing.T) {
 
 	require.Truef(t, bytes.Equal(bodyBytes, []byte(unauthorizedString)), "the body does not the expected payload, received: %s , expected: %s", bodyBytes, payloadBytes)
 
+	// TODO(oskar) - gracefully stop proxy by the end of the test
 	es.Stop(ctx)
 }
