@@ -2,9 +2,10 @@ package main
 
 import (
 	"errors"
-	"io"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
+	"regexp"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -13,6 +14,11 @@ import (
 // Log forwarders like fluentd or fluentbit post log lines in bulk to this
 // elasticsearch endpoint
 const BulkLogsEndpoint = "/_bulk"
+
+var (
+	ErrAllowedIDsNotUsed  = errors.New("AllowedIDs is set but not used with the selected authentication scheme")
+	ErrUsersStringNotUsed = errors.New("AllowedBasicAuthUserString is set but not used with the selected authentication scheme")
+)
 
 func unauthorized(w http.ResponseWriter) {
 	w.WriteHeader(http.StatusUnauthorized)
@@ -28,41 +34,51 @@ func copyHeader(dst, src http.Header) {
 }
 
 type Proxy struct {
-	config        *ProxyConfig
-	httpClient    *http.Client
-	remoteURL     *url.URL
-	signer        Signer
-	authenticator Authenticator
+	config                 *ProxyConfig
+	httpClient             *http.Client
+	remoteURL              *url.URL
+	allowedURLRegexPattern *regexp.Regexp
+	signer                 Signer
+	authenticator          Authenticator
+	reverseProxy           *httputil.ReverseProxy
 }
 
 // isValidTargetEndpoint checks if the request has a valid target depending
 // on the configuration of the proxy
 func (p *Proxy) isValidTargetEndpoint(r *http.Request) bool {
-	return r.URL.Path == BulkLogsEndpoint
+	return p.allowedURLRegexPattern.MatchString(r.URL.Path)
 
 }
 
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if !p.isValidTargetEndpoint(r) {
+	if p.config.AllowedPathRegex != "" && !p.isValidTargetEndpoint(r) {
 		unauthorized(w)
 		return
 	}
 
-	if p.config.InputValidation {
+	if p.config.ShouldValidateRequests {
 		err := p.authenticator.AuthenticateRequest(r)
 		switch err.(type) {
+		case nil:
+			log.Trace("Authentication succesful")
 		case ErrIDNotWhitelisted:
 		case ErrSignatureInvalid:
 			msg := "not authorized to proxy request"
 			http.Error(w, msg, http.StatusUnauthorized)
+
+			log.
+				WithField("error", err).
+				WithField("proxy-id", r.Header.Get(ProxyIDHeader)).
+				Warning("AuthenticateRequest not authorized to proxy request")
+			return
 		default:
 			http.Error(w, err.Error(), http.StatusBadRequest)
+			log.WithField("error", err).Error("AuthenticateRequest returned an error")
+			return
 		}
-		log.WithField("error", err).Error("AuthenticateRequest returned an error")
-		return
 	}
 
-	if p.config.OutputSigning {
+	if p.config.ShouldSignOutgoing {
 		err := p.signer.SignRequest(r)
 		if err != nil {
 			msg := "could not sign request"
@@ -72,25 +88,11 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// RequestURI should not be set, otherwise http.Client will throw an
-	// error
-	r.RequestURI = ""
-	r.URL = p.remoteURL
-
 	p.ProxyRequest(w, r)
 }
 
 func (p *Proxy) ProxyRequest(w http.ResponseWriter, r *http.Request) {
-	resp, err := p.httpClient.Do(r)
-	if err != nil {
-		http.Error(w, "Server Error", http.StatusInternalServerError)
-		log.WithField("error", err).Error("Proxy'ing request failed")
-	}
-	defer resp.Body.Close()
-
-	copyHeader(w.Header(), resp.Header)
-	w.WriteHeader(resp.StatusCode)
-	io.Copy(w, resp.Body)
+	p.reverseProxy.ServeHTTP(w, r)
 }
 
 func NewProxy(pc *ProxyConfig) (*Proxy, error) {
@@ -99,7 +101,7 @@ func NewProxy(pc *ProxyConfig) (*Proxy, error) {
 		httpClient: &http.Client{},
 	}
 
-	if pc.OutputSigning {
+	if pc.ShouldSignOutgoing {
 		if pc.PrivateKeyPath == "" {
 			return nil, errors.New("missing private key")
 		}
@@ -111,14 +113,43 @@ func NewProxy(pc *ProxyConfig) (*Proxy, error) {
 		proxy.signer = signer
 	}
 
-	if pc.InputValidation {
-		allowedPubKeys := strings.Split(pc.AllowedIDs, ",")
-		authenticator, err := NewP2PAuthenticator(allowedPubKeys)
-		if err != nil {
-			return nil, err
+	if pc.ShouldValidateRequests {
+
+		switch pc.AuthenticationScheme {
+		case BasicAuthScheme:
+			if pc.AllowedIDs != "" {
+				return nil, ErrAllowedIDsNotUsed
+			}
+
+			authenticator, err := NewBasicAuthenticatorFromConfigString(pc.AllowedBasicAuthUserString)
+			if err != nil {
+				return nil, err
+			}
+
+			proxy.authenticator = authenticator
+		case EcdsaSignatureScheme:
+			if pc.AllowedBasicAuthUserString != "" {
+				return nil, ErrUsersStringNotUsed
+			}
+
+			allowedPubKeys := strings.Split(pc.AllowedIDs, ",")
+			authenticator, err := NewP2PAuthenticator(allowedPubKeys)
+			if err != nil {
+				return nil, err
+			}
+
+			proxy.authenticator = authenticator
+		case NoAuth:
+			log.Warning("no authentication selected")
+		default:
+			log.Fatal("unknown authentication scheme provided")
+
 		}
 
-		proxy.authenticator = authenticator
+	}
+
+	if pc.AllowedPathRegex != "" {
+		proxy.allowedURLRegexPattern = regexp.MustCompile(pc.AllowedPathRegex)
 	}
 
 	targetURL, err := url.Parse(pc.RemoteAddress)
@@ -126,7 +157,7 @@ func NewProxy(pc *ProxyConfig) (*Proxy, error) {
 		return nil, err
 	}
 
-	proxy.remoteURL = targetURL
+	proxy.reverseProxy = httputil.NewSingleHostReverseProxy(targetURL)
 
 	return proxy, nil
 }
