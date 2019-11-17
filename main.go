@@ -20,24 +20,38 @@ type ProxyConfig struct {
 	// incoming proxy requests using
 	ShouldValidateRequests bool `env:"SHOULD_VALIDATE_REQUESTS"`
 
-	// one of: [ "ecdsasignatures", "basicauth", "none" ]
-	AuthenticationScheme string `env:"AUTHENTICATION_SCHEME" envDefault:"basicauth"`
+	// one of: [ "ECDSA_SIGNATURE_SCHEME", "BASIC_AUTH_SCHEME", "NO_AUTH_SCHEME" ]
+	AuthenticationScheme string `env:"AUTHENTICATION_SCHEME" envDefault:"BASIC_AUTH_SCHEME"`
 
-	// if AuthenticationScheme is basicauth then this string is used for
+	// if AuthenticationScheme is BASIC_AUTH_SCHEME then this string is used for
 	// determining allowed user / password pairs.
 	// NOTE: the string format is: user1:password1,user2:password2
 	AllowedBasicAuthUserString string `env:"ALLOWED_USERS_BASIC_AUTH_STRING" envDefault:""`
 
-	// If AuthenticationScheme is ecdsasigning then this string is used for
-	// determining allowed public identities
+	// If AuthenticationScheme is ECDSA_SIGNATURE_SCHEME then this string is
+	// used for determining allowed public identities
 	// NOTE: the string format is a comma separated b64 encoded pubkeys
 	AllowedIDs string `env:"ALLOWED_IDS"`
 
 	// Should the proxied request be signed by auth-es-proxy
 	ShouldSignOutgoing bool `env:"SHOULD_SIGN_OUTGOING"`
 
-	// Private Key is required when output signing is set to true
+	// SigningScheme sets which signing scheme should be used if
+	// ShouldSignOutgoing is set to true
+	// NOTE: uses the same schemes as AuthenticationScheme
+	SigningScheme string `env:"SIGNING_SCHEME" envDefault:"NO_AUTH_SCHEME"`
+
+	// Private Key is required when output signing is set to true and
+	// SigningScheme is ECDSA_SIGNATURE_SCHEME
 	PrivateKeyPath string `env:"PRIVATE_KEY_PATH"`
+
+	// BasicAuthUser is the Basic Authentication username when using
+	// BASIC_AUTH_SCHEME and output signing is set to true
+	BasicAuthUser string `env:"BASIC_AUTH_USER" envDefault:""`
+
+	// BasicAuthPassword is the Basic Authentication password when using
+	// BASIC_AUTH_SCHEME and output signing is set to true
+	BasicAuthPassword string `env:"BASIC_AUTH_PASSWORD" envDefault:""`
 
 	// If set to a non-empty string the proxy will check whether the
 	// requested path matches this REGEX pattern otherwise returns

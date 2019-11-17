@@ -102,19 +102,34 @@ func NewProxy(pc *ProxyConfig) (*Proxy, error) {
 	}
 
 	if pc.ShouldSignOutgoing {
-		if pc.PrivateKeyPath == "" {
-			return nil, errors.New("missing private key")
-		}
+		switch pc.SigningScheme {
+		case BasicAuthScheme:
+			signer, err := NewBasicAuthSigner(pc.BasicAuthUser, pc.BasicAuthPassword)
+			if err != nil {
+				return nil, err
+			}
 
-		signer, err := NewP2PSignerFromKeyPath(pc.PrivateKeyPath)
-		if err != nil {
-			return nil, err
+			proxy.signer = signer
+		case EcdsaSignatureScheme:
+			if pc.PrivateKeyPath == "" {
+				return nil, errors.New("missing private key")
+			}
+
+			signer, err := NewP2PSignerFromKeyPath(pc.PrivateKeyPath)
+			if err != nil {
+				return nil, err
+			}
+
+			proxy.signer = signer
+		case NoAuth:
+			log.Warning("no signing method selected, yet ShouldSignOutgoing is set to true")
+		default:
+			log.Fatal("unknown signing scheme provided")
+
 		}
-		proxy.signer = signer
 	}
 
 	if pc.ShouldValidateRequests {
-
 		switch pc.AuthenticationScheme {
 		case BasicAuthScheme:
 			if pc.AllowedIDs != "" {

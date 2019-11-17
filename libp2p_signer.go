@@ -9,12 +9,6 @@ import (
 	p2pcrypto "github.com/libp2p/go-libp2p-crypto"
 )
 
-type Signer interface {
-	// SignRequest uses the underlying signing scheme to provide signature
-	// of the body inside of a Proxy-Signature: header
-	SignRequest(*http.Request) error
-}
-
 // NewP2PSigner returns a new Signer which signs requests using libp2p-crypto
 func NewP2PSigner(privKey p2pcrypto.PrivKey) (*P2PSigner, error) {
 	publicKey := privKey.GetPublic()

@@ -11,12 +11,6 @@ import (
 	p2pcrypto "github.com/libp2p/go-libp2p-crypto"
 )
 
-const (
-	BasicAuthScheme      = "BASIC_AUTH_SCHEME"
-	EcdsaSignatureScheme = "ECDSA_SIGNATURE_SCHEME"
-	NoAuth               = "NO_AUTH_SCHEME"
-)
-
 var (
 	ErrMissingProxyIDHeader        = errors.New("missing Proxy-ID request header")
 	ErrFailedToReadRequestBody     = errors.New("failed to read request body")
@@ -36,10 +30,6 @@ type ErrSignatureInvalid struct{}
 
 func (e ErrSignatureInvalid) Error() string {
 	return "Request signature invalid"
-}
-
-type Authenticator interface {
-	AuthenticateRequest(r *http.Request) error
 }
 
 type P2PAuthenticator struct {
