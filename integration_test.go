@@ -161,3 +161,72 @@ func TestAllowedRegexpProxy(t *testing.T) {
 	// TODO(oskar) - gracefully stop proxy by the end of the test
 	es.Stop(ctx)
 }
+
+func TestBasicAuthRoundtrip(t *testing.T) {
+	tc := newTestClient()
+
+	echoServerAddr := "localhost:3010"
+	es := newEchoServer(echoServerAddr)
+
+	ctx := context.Background()
+
+	payload := fmt.Sprintf("{%q:%q}", "hello", "world")
+	payloadBytes := []byte(payload)
+
+	go es.Start()
+
+	// Authentication Proxy setup
+	username := "username"
+	password := "password"
+
+	authProxyConfig := ProxyConfig{
+		RemoteAddress:              "http://" + echoServerAddr,
+		ShouldValidateRequests:     true,
+		AuthenticationScheme:       BasicAuthScheme,
+		AllowedBasicAuthUserString: fmt.Sprintf("%s:%s", username, password),
+	}
+	authProxyAddr := "localhost:3012"
+
+	proxy, err := NewProxy(&authProxyConfig)
+
+	require.NoError(t, err)
+
+	go func() {
+		t.Log(http.ListenAndServe(authProxyAddr, proxy))
+	}()
+
+	// Signign Proxy Setup
+	signingProxyConfig := ProxyConfig{
+		RemoteAddress:      "http://" + authProxyAddr,
+		ShouldSignOutgoing: true,
+		SigningScheme:      BasicAuthScheme,
+		BasicAuthUser:      username,
+		BasicAuthPassword:  password,
+	}
+	signingProxyAddr := "localhost:3013"
+
+	signingProxy, err := NewProxy(&signingProxyConfig)
+
+	require.NoError(t, err)
+
+	go func() {
+		t.Log(http.ListenAndServe(signingProxyAddr, signingProxy))
+	}()
+
+	// Test Request
+	resp, err := tc.SendPOST("http://"+signingProxyAddr, payloadBytes)
+
+	require.NoError(t, err)
+
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+
+	require.NoError(t, err, "could not read body")
+
+	require.Truef(t, bytes.Equal(bodyBytes, payloadBytes), "the body does not have the expected payload, received: %s , expected: %s", bodyBytes, payloadBytes)
+
+	headerValue := resp.Header.Get(TestHeaderKey)
+
+	require.Equalf(t, headerValue, TestHeaderValue, "the expected value for %s header is %s instead got %s", TestHeaderKey, TestHeaderValue, headerValue)
+
+	es.Stop(ctx)
+}
