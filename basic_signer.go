@@ -32,7 +32,7 @@ type BasicAuthSigner struct {
 	password string
 }
 
-func (p *BasicAuthSigner) SignRequest(r *http.Request) error {
-	r.SetBasicAuth(p.username, p.password)
+func (b *BasicAuthSigner) SignRequest(r *http.Request) error {
+	r.SetBasicAuth(b.username, b.password)
 	return nil
 }
