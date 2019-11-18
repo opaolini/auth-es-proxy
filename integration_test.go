@@ -19,6 +19,13 @@ type testClient struct {
 	httpClient *http.Client
 }
 
+func setupServer(addr string, handler http.Handler) *http.Server {
+	return &http.Server{
+		Addr:    addr,
+		Handler: handler,
+	}
+}
+
 func (c *testClient) send(method, url string, payload []byte) (*http.Response, error) {
 	req, err := http.NewRequest(method, url, bytes.NewBuffer(payload))
 
@@ -95,29 +102,26 @@ func TestBasicSingleProxySetup(t *testing.T) {
 		ShouldValidateRequests: false,
 	}
 	proxy, err := NewProxy(&proxyConfig)
-
 	require.NoError(t, err)
 
+	proxyServer := setupServer("localhost:3012", proxy)
+
 	go func() {
-		t.Log(http.ListenAndServe("localhost:3012", proxy))
+		t.Log(proxyServer.ListenAndServe())
 	}()
 
 	resp, err := tc.SendPOST("http://localhost:3012/", payloadBytes)
-
 	require.NoError(t, err)
 
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
-
 	require.NoError(t, err, "could not read body")
-
 	require.Truef(t, bytes.Equal(bodyBytes, payloadBytes), "the body does not have the expected payload, received: %s , expected: %s", bodyBytes, payloadBytes)
 
 	headerValue := resp.Header.Get(TestHeaderKey)
-
 	require.Equalf(t, headerValue, TestHeaderValue, "the expected value for %s header is %s instead got %s", TestHeaderKey, TestHeaderValue, headerValue)
 
-	// TODO(oskar) - gracefully stop proxy by the end of the test
 	es.Stop(ctx)
+	proxyServer.Shutdown(ctx)
 }
 
 func TestAllowedRegexpProxy(t *testing.T) {
@@ -134,11 +138,12 @@ func TestAllowedRegexpProxy(t *testing.T) {
 		AllowedPathRegex:       "/$",
 	}
 	proxy, err := NewProxy(&proxyConfig)
-
 	require.NoError(t, err)
 
+	proxyServer := setupServer("localhost:3011", proxy)
+
 	go func() {
-		t.Log(http.ListenAndServe("localhost:3011", proxy))
+		t.Log(proxyServer.ListenAndServe())
 	}()
 
 	payload := fmt.Sprintf("{%q:%q}", "hello", "world")
@@ -158,8 +163,8 @@ func TestAllowedRegexpProxy(t *testing.T) {
 
 	require.Truef(t, bytes.Equal(bodyBytes, []byte(unauthorizedString)), "the body does not the expected payload, received: %s , expected: %s", bodyBytes, payloadBytes)
 
-	// TODO(oskar) - gracefully stop proxy by the end of the test
 	es.Stop(ctx)
+	proxyServer.Shutdown(ctx)
 }
 
 func TestBasicAuthRoundtrip(t *testing.T) {
@@ -190,8 +195,10 @@ func TestBasicAuthRoundtrip(t *testing.T) {
 	proxy, err := NewProxy(&authProxyConfig)
 	require.NoError(t, err)
 
+	authProxyServer := setupServer(authProxyAddr, proxy)
+
 	go func() {
-		t.Log(http.ListenAndServe(authProxyAddr, proxy))
+		t.Log(authProxyServer.ListenAndServe())
 	}()
 
 	// Signign Proxy Setup
@@ -205,11 +212,12 @@ func TestBasicAuthRoundtrip(t *testing.T) {
 	signingProxyAddr := "localhost:3013"
 
 	signingProxy, err := NewProxy(&signingProxyConfig)
-
 	require.NoError(t, err)
 
+	signingProxyServer := setupServer(signingProxyAddr, signingProxy)
+
 	go func() {
-		t.Log(http.ListenAndServe(signingProxyAddr, signingProxy))
+		t.Log(signingProxyServer.ListenAndServe())
 	}()
 
 	// Test Request
@@ -224,4 +232,6 @@ func TestBasicAuthRoundtrip(t *testing.T) {
 	require.Equalf(t, headerValue, TestHeaderValue, "the expected value for %s header is %s instead got %s", TestHeaderKey, TestHeaderValue, headerValue)
 
 	es.Stop(ctx)
+	authProxyServer.Shutdown(ctx)
+	signingProxyServer.Shutdown(ctx)
 }
