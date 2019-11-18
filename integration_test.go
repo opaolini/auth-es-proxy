@@ -188,7 +188,6 @@ func TestBasicAuthRoundtrip(t *testing.T) {
 	authProxyAddr := "localhost:3012"
 
 	proxy, err := NewProxy(&authProxyConfig)
-
 	require.NoError(t, err)
 
 	go func() {
@@ -215,17 +214,13 @@ func TestBasicAuthRoundtrip(t *testing.T) {
 
 	// Test Request
 	resp, err := tc.SendPOST("http://"+signingProxyAddr, payloadBytes)
-
 	require.NoError(t, err)
 
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
-
 	require.NoError(t, err, "could not read body")
-
 	require.Truef(t, bytes.Equal(bodyBytes, payloadBytes), "the body does not have the expected payload, received: %s , expected: %s", bodyBytes, payloadBytes)
 
 	headerValue := resp.Header.Get(TestHeaderKey)
-
 	require.Equalf(t, headerValue, TestHeaderValue, "the expected value for %s header is %s instead got %s", TestHeaderKey, TestHeaderValue, headerValue)
 
 	es.Stop(ctx)
