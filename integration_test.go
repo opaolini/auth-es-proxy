@@ -19,6 +19,13 @@ type testClient struct {
 	httpClient *http.Client
 }
 
+func setupServer(addr string, handler http.Handler) *http.Server {
+	return &http.Server{
+		Addr:    addr,
+		Handler: handler,
+	}
+}
+
 func (c *testClient) send(method, url string, payload []byte) (*http.Response, error) {
 	req, err := http.NewRequest(method, url, bytes.NewBuffer(payload))
 
@@ -95,29 +102,26 @@ func TestBasicSingleProxySetup(t *testing.T) {
 		ShouldValidateRequests: false,
 	}
 	proxy, err := NewProxy(&proxyConfig)
-
 	require.NoError(t, err)
 
+	proxyServer := setupServer("localhost:3012", proxy)
+
 	go func() {
-		t.Log(http.ListenAndServe("localhost:3012", proxy))
+		t.Log(proxyServer.ListenAndServe())
 	}()
 
 	resp, err := tc.SendPOST("http://localhost:3012/", payloadBytes)
-
 	require.NoError(t, err)
 
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
-
 	require.NoError(t, err, "could not read body")
-
 	require.Truef(t, bytes.Equal(bodyBytes, payloadBytes), "the body does not have the expected payload, received: %s , expected: %s", bodyBytes, payloadBytes)
 
 	headerValue := resp.Header.Get(TestHeaderKey)
-
 	require.Equalf(t, headerValue, TestHeaderValue, "the expected value for %s header is %s instead got %s", TestHeaderKey, TestHeaderValue, headerValue)
 
-	// TODO(oskar) - gracefully stop proxy by the end of the test
 	es.Stop(ctx)
+	proxyServer.Shutdown(ctx)
 }
 
 func TestAllowedRegexpProxy(t *testing.T) {
@@ -134,11 +138,12 @@ func TestAllowedRegexpProxy(t *testing.T) {
 		AllowedPathRegex:       "/$",
 	}
 	proxy, err := NewProxy(&proxyConfig)
-
 	require.NoError(t, err)
 
+	proxyServer := setupServer("localhost:3011", proxy)
+
 	go func() {
-		t.Log(http.ListenAndServe("localhost:3011", proxy))
+		t.Log(proxyServer.ListenAndServe())
 	}()
 
 	payload := fmt.Sprintf("{%q:%q}", "hello", "world")
@@ -158,6 +163,75 @@ func TestAllowedRegexpProxy(t *testing.T) {
 
 	require.Truef(t, bytes.Equal(bodyBytes, []byte(unauthorizedString)), "the body does not the expected payload, received: %s , expected: %s", bodyBytes, payloadBytes)
 
-	// TODO(oskar) - gracefully stop proxy by the end of the test
 	es.Stop(ctx)
+	proxyServer.Shutdown(ctx)
+}
+
+func TestBasicAuthRoundtrip(t *testing.T) {
+	tc := newTestClient()
+
+	echoServerAddr := "localhost:3010"
+	es := newEchoServer(echoServerAddr)
+
+	ctx := context.Background()
+
+	payload := fmt.Sprintf("{%q:%q}", "hello", "world")
+	payloadBytes := []byte(payload)
+
+	go es.Start()
+
+	// Authentication Proxy setup
+	username := "username"
+	password := "password"
+
+	authProxyConfig := ProxyConfig{
+		RemoteAddress:              "http://" + echoServerAddr,
+		ShouldValidateRequests:     true,
+		AuthenticationScheme:       BasicAuthScheme,
+		AllowedBasicAuthUserString: fmt.Sprintf("%s:%s", username, password),
+	}
+	authProxyAddr := "localhost:3012"
+
+	proxy, err := NewProxy(&authProxyConfig)
+	require.NoError(t, err)
+
+	authProxyServer := setupServer(authProxyAddr, proxy)
+
+	go func() {
+		t.Log(authProxyServer.ListenAndServe())
+	}()
+
+	// Signign Proxy Setup
+	signingProxyConfig := ProxyConfig{
+		RemoteAddress:      "http://" + authProxyAddr,
+		ShouldSignOutgoing: true,
+		SigningScheme:      BasicAuthScheme,
+		BasicAuthUser:      username,
+		BasicAuthPassword:  password,
+	}
+	signingProxyAddr := "localhost:3013"
+
+	signingProxy, err := NewProxy(&signingProxyConfig)
+	require.NoError(t, err)
+
+	signingProxyServer := setupServer(signingProxyAddr, signingProxy)
+
+	go func() {
+		t.Log(signingProxyServer.ListenAndServe())
+	}()
+
+	// Test Request
+	resp, err := tc.SendPOST("http://"+signingProxyAddr, payloadBytes)
+	require.NoError(t, err)
+
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	require.NoError(t, err, "could not read body")
+	require.Truef(t, bytes.Equal(bodyBytes, payloadBytes), "the body does not have the expected payload, received: %s , expected: %s", bodyBytes, payloadBytes)
+
+	headerValue := resp.Header.Get(TestHeaderKey)
+	require.Equalf(t, headerValue, TestHeaderValue, "the expected value for %s header is %s instead got %s", TestHeaderKey, TestHeaderValue, headerValue)
+
+	es.Stop(ctx)
+	authProxyServer.Shutdown(ctx)
+	signingProxyServer.Shutdown(ctx)
 }
