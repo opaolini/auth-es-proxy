@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -172,7 +173,60 @@ func NewProxy(pc *ProxyConfig) (*Proxy, error) {
 		return nil, err
 	}
 
-	proxy.reverseProxy = httputil.NewSingleHostReverseProxy(targetURL)
+	log.Info("new proxy for ", targetURL)
+
+	proxy.reverseProxy = newSingleHostReverseProxy(targetURL)
 
 	return proxy, nil
+}
+
+// newSingleHostReverseProxy returns a new ReverseProxy that routes
+// URLs to the scheme, host, and base path provided in target. If the
+// target's path is "/base" and the incoming request was for "/dir",
+// the target request will be for /base/dir.
+// NewSingleHostReverseProxy does not rewrite the Host header.
+// To rewrite Host headers, use ReverseProxy directly with a custom
+// Director policy.
+func newSingleHostReverseProxy(target *url.URL) *httputil.ReverseProxy {
+	targetQuery := target.RawQuery
+	director := func(req *http.Request) {
+		req.URL.Scheme = target.Scheme
+		req.URL.Host = target.Host
+		req.URL.Path = singleJoiningSlash(target.Path, req.URL.Path)
+		if targetQuery == "" || req.URL.RawQuery == "" {
+			req.URL.RawQuery = targetQuery + req.URL.RawQuery
+		} else {
+			req.URL.RawQuery = targetQuery + "&" + req.URL.RawQuery
+		}
+		if _, ok := req.Header["User-Agent"]; !ok {
+			// explicitly disable User-Agent so it's not set to default value
+			req.Header.Set("User-Agent", "")
+		}
+
+		req.Host = target.Host // set Host header as expected by target
+	}
+	return &httputil.ReverseProxy{Director: director}
+}
+
+func singleJoiningSlash(a, b string) string {
+	aslash := strings.HasSuffix(a, "/")
+	bslash := strings.HasPrefix(b, "/")
+	switch {
+	case aslash && bslash:
+		return a + b[1:]
+	case !aslash && !bslash:
+		return a + "/" + b
+	}
+	return a + b
+}
+
+type DebugTransport struct{}
+
+func (DebugTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	b, err := httputil.DumpRequestOut(r, false)
+	if err != nil {
+		return nil, err
+	}
+	fmt.Println(string(b))
+	return http.DefaultTransport.RoundTrip(r)
 }
