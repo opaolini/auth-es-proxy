@@ -7,10 +7,6 @@ platform:
 
 
 steps:
-  - name: test
-    image: golang
-    commands:
-    - go test .
   - name: docker  
     image: plugins/docker
     settings:
