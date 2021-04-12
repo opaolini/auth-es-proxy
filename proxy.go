@@ -3,11 +3,13 @@ package main
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -168,14 +170,12 @@ func NewProxy(pc *ProxyConfig) (*Proxy, error) {
 		proxy.allowedURLRegexPattern = regexp.MustCompile(pc.AllowedPathRegex)
 	}
 
-	targetURL, err := url.Parse(pc.RemoteAddress)
+	newProxy, err := newSingleHostReverseProxy(pc)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Info("new proxy for ", targetURL)
-
-	proxy.reverseProxy = newSingleHostReverseProxy(targetURL)
+	proxy.reverseProxy = newProxy
 
 	return proxy, nil
 }
@@ -187,7 +187,14 @@ func NewProxy(pc *ProxyConfig) (*Proxy, error) {
 // NewSingleHostReverseProxy does not rewrite the Host header.
 // To rewrite Host headers, use ReverseProxy directly with a custom
 // Director policy.
-func newSingleHostReverseProxy(target *url.URL) *httputil.ReverseProxy {
+func newSingleHostReverseProxy(pc *ProxyConfig) (*httputil.ReverseProxy, error) {
+	target, err := url.Parse(pc.RemoteAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Info("new proxy for ", target)
+
 	targetQuery := target.RawQuery
 	director := func(req *http.Request) {
 		req.URL.Scheme = target.Scheme
@@ -205,7 +212,21 @@ func newSingleHostReverseProxy(target *url.URL) *httputil.ReverseProxy {
 
 		req.Host = target.Host // set Host header as expected by target
 	}
-	return &httputil.ReverseProxy{Director: director}
+	transport := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}).DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		ResponseHeaderTimeout: pc.ResponseTimeout,
+	}
+	return &httputil.ReverseProxy{Director: director, Transport: transport}, nil
 }
 
 func singleJoiningSlash(a, b string) string {

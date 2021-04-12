@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/caarlos0/env/v6"
 
@@ -57,6 +58,9 @@ type ProxyConfig struct {
 	// requested path matches this REGEX pattern otherwise returns
 	// unauthorized
 	AllowedPathRegex string `env:"ALLOWED_PATH_REGEX" envDefault:""`
+
+	// Response timeout for proxy requests
+	ResponseTimeout time.Duration `env:"RESPONSE_TIMEOUT" envDefault:"60s"`
 }
 
 func main() {
